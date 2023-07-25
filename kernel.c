@@ -19,24 +19,24 @@
  
 /* Hardware text mode color constants. */
 enum vga_color {
-	COLOR_BLACK = 0,
-	COLOR_BLUE = 1,
-	COLOR_GREEN = 2,
-	COLOR_CYAN = 3,
-	COLOR_RED = 4,
-	COLOR_MAGENTA = 5,
-	COLOR_BROWN = 6,
-	COLOR_LIGHT_GREY = 7,
-	COLOR_DARK_GREY = 8,
-	COLOR_LIGHT_BLUE = 9,
-	COLOR_LIGHT_GREEN = 10,
-	COLOR_LIGHT_CYAN = 11,
-	COLOR_LIGHT_RED = 12,
-	COLOR_LIGHT_MAGENTA = 13,
-	COLOR_LIGHT_BROWN = 14,
-	COLOR_WHITE = 15,
+  COLOR_BLACK = 0,
+  COLOR_BLUE = 1,
+  COLOR_GREEN = 2,
+  COLOR_CYAN = 3,
+  COLOR_RED = 4,
+  COLOR_MAGENTA = 5,
+  COLOR_BROWN = 6,
+  COLOR_LIGHT_GREY = 7,
+  COLOR_DARK_GREY = 8,
+  COLOR_LIGHT_BLUE = 9,
+  COLOR_LIGHT_GREEN = 10,
+  COLOR_LIGHT_CYAN = 11,
+  COLOR_LIGHT_RED = 12,
+  COLOR_LIGHT_MAGENTA = 13,
+  COLOR_LIGHT_BROWN = 14,
+  COLOR_WHITE = 15,
 };
- 
+
 uint8_t make_color(enum vga_color fg, enum vga_color bg) {
   return fg | bg << 4;
 }
@@ -65,7 +65,7 @@ uint16_t* terminal_buffer;
 void terminal_initialize() {
   terminal_row = 0;
   terminal_column = 0;
-  terminal_color = make_color(COLOR_LIGHT_GREY, COLOR_BLACK);
+  terminal_color = make_color(COLOR_RED, COLOR_BLACK);
   terminal_buffer = (uint16_t*) 0xB8000;
   for (size_t y = 0; y < VGA_HEIGHT; y++) {
     for (size_t x = 0; x < VGA_WIDTH; x++) {
@@ -97,7 +97,32 @@ void terminal_putchar(char c) {
 void terminal_writestring(const char* data) {
   size_t datalen = strlen(data);
   for (size_t i = 0; i < datalen; i++)
-    terminal_putchar(data[i]);
+    if (data[i] == '\n') {
+      terminal_column = 0;
+      terminal_row++;
+    } else {
+      terminal_putchar(data[i]);
+    }
+}
+
+void printOnTerminal(char* text, uint8_t color) {
+  terminal_setcolor(color);
+  terminal_writestring(text);
+}
+
+uint8_t get_color(int index) {
+  /*
+  get color based on index
+  */
+  if (index == 0) {
+    return COLOR_RED;
+  } else if (index >= 1 && index <= 6) {
+    return COLOR_WHITE;
+  } else if (index >= 7 && index <= 24) {
+    return COLOR_BLUE;
+  } else {
+    return COLOR_GREEN;
+  }
 }
 
 #if defined(__cplusplus)
@@ -106,10 +131,23 @@ extern "C" /* Use C linkage for kernel_main. */
 void kernel_main() {
   /* Initialize terminal interface */
   terminal_initialize();
-  
-  /* Since there is no support for newlines in terminal_putchar
-   * yet, '\n' will produce some VGA specific character instead.
-   * This is normal.
-   */
-  terminal_writestring("Hello, kernel World!\n");
+
+  for(int i = 0; i <= 31; i++) {
+    if (terminal_row <= VGA_HEIGHT) {
+      // before height limit is reached
+      uint8_t color = get_color(i);
+      printOnTerminal("Hello, kernel World!\n", color);
+    } else {
+      // moving 1 row up
+      for (size_t x = 0; x < VGA_HEIGHT; x++) {
+        for(size_t y = 0; y < VGA_WIDTH; y++) {
+          size_t index = x * VGA_WIDTH + y;
+          size_t next = (x+1) * VGA_WIDTH + y;
+          terminal_buffer[index] = terminal_buffer[next];
+        }
+      }
+      // Adding last row
+      printOnTerminal("Hello, kernel World!\n", COLOR_GREEN);
+    }
+  }
 }
